@@ -1,6 +1,6 @@
 --[[
     ================================================
-    Universal Free Cam (Виправлена версія)
+    Universal Free Cam (Виправлена версія 2.0)
     ================================================
 ]]
 
@@ -151,7 +151,6 @@ local sensitivity = 0.18
 local sprintMultiplier = 3
 local pitch, yaw = 0, 0
 local camPos = nil
-local renderConn = nil
 local hotkey = Enum.KeyCode.F
 local waitingForBind = false
 
@@ -161,9 +160,7 @@ local function AddHover(button, hoverColor)
 	button.MouseEnter:Connect(function() TweenService:Create(button, hoverTweenInfo, {BackgroundColor3 = hoverColor}):Play() end)
 	button.MouseLeave:Connect(function() TweenService:Create(button, hoverTweenInfo, {BackgroundColor3 = BTN_COLOR}):Play() end)
 end
-AddHover(toggleBtn, BTN_HOVER)
-AddHover(bindBtn, Color3.fromRGB(100,50,180))
-AddHover(sliderKnob, Color3.fromRGB(255,200,255))
+AddHover(toggleBtn, BTN_HOVER); AddHover(bindBtn, Color3.fromRGB(100,50,180)); AddHover(sliderKnob, Color3.fromRGB(255,200,255))
 
 local function freezeCharacter(char, freeze)
 	if not char then return end
@@ -180,59 +177,60 @@ end
 -- ОСНОВНА ЛОГІКА FREE CAM (ВИПРАВЛЕНО)
 -- ==========================================================
 
+-- Ця функція буде оновлювати камеру кожен кадр
+local function updateCamera(dt)
+	-- Обертання камери
+	local mouseDelta = UserInputService:GetMouseDelta()
+	yaw = yaw - mouseDelta.X * sensitivity
+	pitch = math.clamp(pitch - mouseDelta.Y * sensitivity, -89, 89)
+	local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
+	
+	-- Рух камери
+	local fwd, right = rot.LookVector, rot.RightVector
+	local movement = Vector3.zero
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then movement += fwd end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then movement -= fwd end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then movement -= right end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then movement += right end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then movement += Vector3.yAxis end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then movement -= Vector3.yAxis end
+	
+	local speed = baseSpeed
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then speed *= sprintMultiplier end
+	
+	if movement.Magnitude > 0 then
+		camPos += movement.Unit * speed * dt
+	end
+	
+	camera.CFrame = CFrame.new(camPos) * rot
+end
+
 local function enableFreeCam()
 	if freecamEnabled then return end
 	freecamEnabled = true
-	toggleBtn.Text = "ON"
-	toggleBtn.BackgroundColor3 = Color3.fromRGB(60,120,60)
+	toggleBtn.Text = "ON"; toggleBtn.BackgroundColor3 = Color3.fromRGB(60,120,60)
+	
 	local char = player.Character
 	freezeCharacter(char, true)
 	
 	UserInputService.MouseIconEnabled = false
 	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 	camPos = camera.CFrame.Position
-	local rx, ry = camera.CFrame:ToEulerAnglesYXZ()
+	local ry, rx = camera.CFrame:ToEulerAnglesYXZ() -- Правильний порядок
 	pitch, yaw = math.deg(rx), math.deg(ry)
 	camera.CameraType = Enum.CameraType.Scriptable
 	
-	-- Створюємо з'єднання з RenderStepped
-	renderConn = RunService.RenderStepped:Connect(function(dt)
-		-- Обертання камери
-		local mouseDelta = UserInputService:GetMouseDelta()
-		yaw = yaw - mouseDelta.X * sensitivity
-		pitch = math.clamp(pitch - mouseDelta.Y * sensitivity, -89, 89)
-		local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
-		
-		-- **ВИПРАВЛЕНО:** Перевірка натиснутих клавіш всередині циклу
-		local fwd, right = rot.LookVector, rot.RightVector
-		local movement = Vector3.zero
-		if UserInputService:IsKeyDown(Enum.KeyCode.W) then movement += fwd end
-		if UserInputService:IsKeyDown(Enum.KeyCode.S) then movement -= fwd end
-		if UserInputService:IsKeyDown(Enum.KeyCode.A) then movement -= right end
-		if UserInputService:IsKeyDown(Enum.KeyCode.D) then movement += right end
-		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then movement += Vector3.yAxis end
-		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then movement -= Vector3.yAxis end
-		
-		-- Розрахунок швидкості
-		local speed = baseSpeed
-		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then speed *= sprintMultiplier end
-		
-		-- Рух камери
-		if movement.Magnitude > 0 then
-			camPos += movement.Unit * speed * dt
-		end
-		
-		-- Оновлення позиції камери
-		camera.CFrame = CFrame.new(camPos) * rot
-	end)
+	-- **КЛЮЧОВЕ ВИПРАВЛЕННЯ:** Прив'язуємо оновлення до RenderStepped з високим пріоритетом
+	RunService:BindToRenderStep("FreeCamUpdate", Enum.RenderPriority.Camera.Value + 1, updateCamera)
 end
 
 local function disableFreeCam()
 	if not freecamEnabled then return end
 	freecamEnabled = false
-	toggleBtn.Text = "OFF"
-	toggleBtn.BackgroundColor3 = BTN_COLOR
-	if renderConn then renderConn:Disconnect(); renderConn = nil end
+	toggleBtn.Text = "OFF"; toggleBtn.BackgroundColor3 = BTN_COLOR
+	
+	-- Відв'язуємо функцію оновлення
+	RunService:UnbindFromRenderStep("FreeCamUpdate")
 	
 	UserInputService.MouseIconEnabled = true
 	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
@@ -262,22 +260,11 @@ local function updateSliderFromX(x)
 	setSpeedFromPercent((x-barX)/barW)
 end
 
-sliderBar.InputBegan:Connect(function(input)
-	if input.UserInputType==Enum.UserInputType.MouseButton1 then
-		draggingSlider=true; updateSliderFromX(UserInputService:GetMouseLocation().X)
-	end
-end)
-sliderBar.InputEnded:Connect(function(input)
-	if input.UserInputType==Enum.UserInputType.MouseButton1 then draggingSlider=false end
-end)
-UserInputService.InputChanged:Connect(function(input)
-	if draggingSlider and input.UserInputType==Enum.UserInputType.MouseMovement then
-		updateSliderFromX(input.Position.X)
-	end
-end)
+sliderBar.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 then draggingSlider=true; updateSliderFromX(input.Position.X) end end)
+sliderBar.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 then draggingSlider=false end end)
+UserInputService.InputChanged:Connect(function(input) if draggingSlider and input.UserInputType==Enum.UserInputType.MouseMovement then updateSliderFromX(input.Position.X) end end)
 
 -- Обробники кнопок та хоткеїв (без змін)
-local fadeTweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 UserInputService.InputBegan:Connect(function(input, gp)
 	if waitingForBind and input.UserInputType==Enum.UserInputType.Keyboard then
 		hotkey=input.KeyCode; bindBtn.Text="Key: "..hotkey.Name; waitingForBind=false; return
@@ -287,37 +274,16 @@ UserInputService.InputBegan:Connect(function(input, gp)
 	if input.KeyCode==hotkey then
 		if freecamEnabled then disableFreeCam() else enableFreeCam() end
 	elseif input.KeyCode==Enum.KeyCode.RightShift then
-		container.Visible = not container.Visible -- Спрощено для наочності
+		container.Visible = not container.Visible
 	end
 end)
 
-bindBtn.MouseButton1Click:Connect(function()
-	if waitingForBind then return end
-	waitingForBind=true; bindBtn.Text="Press any key..."
-end)
-
-toggleBtn.MouseButton1Click:Connect(function()
-	if freecamEnabled then disableFreeCam() else enableFreeCam() end
-end)
+bindBtn.MouseButton1Click:Connect(function() if not waitingForBind then waitingForBind=true; bindBtn.Text="Press any key..." end end)
+toggleBtn.MouseButton1Click:Connect(function() if freecamEnabled then disableFreeCam() else enableFreeCam() end end)
 
 -- Перетягування вікна (без змін)
 local dragging=false; local dragInput, mousePos, framePos
-title.InputBegan:Connect(function(input)
-	if input.UserInputType==Enum.UserInputType.MouseButton1 then
-		dragging=true; mousePos=input.Position; framePos=container.Position
-		input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false end end)
-	end
-end)
-UserInputService.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - mousePos
-		container.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
-	end
-end)
+title.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; mousePos=input.Position; framePos=container.Position; input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false end end) end end)
+UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta=input.Position-mousePos; container.Position=UDim2.new(framePos.X.Scale,framePos.X.Offset+delta.X,framePos.Y.Scale,framePos.Y.Offset+delta.Y) end end)
 
-player.CharacterAdded:Connect(function(char)
-	if freecamEnabled then
-		task.wait(0.1) -- Даємо персонажу завантажитись
-		freezeCharacter(char,true)
-	end
-end)
+player.CharacterAdded:Connect(function(char) if freecamEnabled then task.wait(0.1); freezeCharacter(char,true) end end)
