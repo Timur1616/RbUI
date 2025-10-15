@@ -152,14 +152,7 @@ function FreeCam:Init(section)
     end)
 
     -- Slider швидкості
-pcall(function()
-    if section and section.NewSlider then
-        section:NewSlider("Speed", "FreeCam speed", FreeCam._minSpeed, FreeCam._maxSpeed, FreeCam._baseSpeed, function(val)
-            -- Інвертуємо відображення у GUI, якщо потрібно
-            FreeCam:SetSpeed(val)
-        end)
-    end
-end)
+
 end
 
 function FreeCam:Shutdown()
