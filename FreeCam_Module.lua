@@ -1,28 +1,22 @@
---[[
-    ================================================
-    Модуль логіки для Universal Free Cam
-    (Виправлена версія 2.1 - Надійна обробка вводу)
-    ================================================
-]]
-local FreeCamModule = {}
-
--- Сервіси та змінні
+local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-local Player = game:GetService("Players").LocalPlayer
 
--- Локальні змінні стану
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
 local freecamEnabled = false
 local baseSpeed = 32
 local minSpeed, maxSpeed = 5, 250
 local sensitivity = 0.18
 local sprintMultiplier = 3
-local pitch, yaw = 0, 0
+local pitch, yaw = 0,0
 local camPos = nil
-local freeCamToggleObject = nil -- Для зв'язку з UI
+local renderConn = nil
+local moveKeys = {W=false,A=false,S=false,D=false,Space=false,LeftControl=false,LeftShift=false}
+local hotkey = Enum.KeyCode.F
 
--- "Заморожує" або "розморожує" персонажа
+-- Функція для заморозки персонажа
 local function freezeCharacter(char, freeze)
 	if not char then return end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -34,102 +28,89 @@ local function freezeCharacter(char, freeze)
 	end
 end
 
--- Функція, що оновлює позицію камери кожен кадр
-local function updateCamera(dt)
-	-- Обертання камери за рухом миші
-	local mouseDelta = UserInputService:GetMouseDelta()
-	yaw = yaw - mouseDelta.X * sensitivity
-	pitch = math.clamp(pitch - mouseDelta.Y * sensitivity, -89, 89)
-	local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
-	
-	-- Рух камери за натисканням клавіш
-	local fwd, right = rot.LookVector, rot.RightVector
-	local movement = Vector3.zero
-	if UserInputService:IsKeyDown(Enum.KeyCode.W) then movement += fwd end
-	if UserInputService:IsKeyDown(Enum.KeyCode.S) then movement -= fwd end
-	if UserInputService:IsKeyDown(Enum.KeyCode.A) then movement -= right end
-	if UserInputService:IsKeyDown(Enum.KeyCode.D) then movement += right end
-	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then movement += Vector3.yAxis end
-	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then movement -= Vector3.yAxis end
-	
-	local speed = baseSpeed
-	if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then speed *= sprintMultiplier end
-	
-	if movement.Magnitude > 0 then
-		camPos += movement.Unit * speed * dt
-	end
-	
-	-- Застосування нової позиції до камери
-	camera.CFrame = CFrame.new(camPos) * rot
-end
-
--- Вмикає режим вільної камери
+-- Увімкнення FreeCam
 local function enableFreeCam()
 	if freecamEnabled then return end
 	freecamEnabled = true
-	
-	local char = Player.Character
+	local char = player.Character or player.CharacterAdded:Wait()
 	freezeCharacter(char, true)
-	
 	UserInputService.MouseIconEnabled = false
 	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 	camPos = camera.CFrame.Position
-	local ry, rx = camera.CFrame:ToEulerAnglesYXZ()
+	local rx, ry, rz = camera.CFrame:ToEulerAnglesYXZ()
 	pitch, yaw = math.deg(rx), math.deg(ry)
 	camera.CameraType = Enum.CameraType.Scriptable
-	
-	-- Прив'язуємо оновлення до RenderStepped з високим пріоритетом
-	RunService:BindToRenderStep("FreeCamUpdate", Enum.RenderPriority.Camera.Value + 10, updateCamera)
+
+	renderConn = RunService.RenderStepped:Connect(function(dt)
+		local dx, dy = UserInputService:GetMouseDelta().X, UserInputService:GetMouseDelta().Y
+		yaw = yaw - dx*sensitivity
+		pitch = math.clamp(pitch - dy*sensitivity,-89,89)
+		local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
+		local fwd, right = rot.LookVector, rot.RightVector
+		local movement = Vector3.zero
+		if moveKeys.W then movement += fwd end
+		if moveKeys.S then movement -= fwd end
+		if moveKeys.A then movement -= right end
+		if moveKeys.D then movement += right end
+		if moveKeys.Space then movement += Vector3.yAxis end
+		if moveKeys.LeftControl then movement -= Vector3.yAxis end
+		local speed = baseSpeed
+		if moveKeys.LeftShift then speed *= sprintMultiplier end
+		if movement.Magnitude > 0 then camPos += movement.Unit * speed * dt end
+		camera.CFrame = CFrame.new(camPos) * rot
+	end)
 end
 
--- Вимикає режим вільної камери
+-- Вимкнення FreeCam
 local function disableFreeCam()
 	if not freecamEnabled then return end
 	freecamEnabled = false
-	
-	-- Відв'язуємо функцію оновлення
-	RunService:UnbindFromRenderStep("FreeCamUpdate")
-	
+	if renderConn then renderConn:Disconnect() renderConn=nil end
 	UserInputService.MouseIconEnabled = true
 	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-	local char = Player.Character
+	local char = player.Character or player.CharacterAdded:Wait()
 	freezeCharacter(char, false)
-	
 	camera.CameraType = Enum.CameraType.Custom
-	if char and char:FindFirstChildOfClass("Humanoid") then
-		camera.CameraSubject = char:FindFirstChildOfClass("Humanoid")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if hum then camera.CameraSubject = hum end
+end
+
+-- Зміна швидкості
+local function setSpeed(speed)
+	baseSpeed = math.clamp(speed, minSpeed, maxSpeed)
+end
+
+-- Клавіші руху
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp or UserInputService:GetFocusedTextBox() then return end
+	if input.UserInputType == Enum.UserInputType.Keyboard then
+		local name = input.KeyCode.Name
+		if moveKeys[name] ~= nil then moveKeys[name] = true end
+		if input.KeyCode == hotkey then
+			if freecamEnabled then disableFreeCam() else enableFreeCam() end
+		end
 	end
-end
+end)
 
--- Ця функція викликається головним скриптом для створення елементів керування
-function FreeCamModule:Init(freeCamSection)
-    freeCamToggleObject = freeCamSection:NewToggle("Enable Free Cam", "Activates free camera mode", function(toggled)
-        if toggled then enableFreeCam() else disableFreeCam() end
-    end)
-    
-    freeCamSection:NewSlider("Speed", "Adjusts camera movement speed", maxSpeed, minSpeed, function(value)
-        baseSpeed = math.floor(value)
-    end):UpdateSlider(baseSpeed)
-    
-    freeCamSection:NewKeybind("Toggle Hotkey", "Set a key to toggle free cam", Enum.KeyCode.F, function()
-        if freeCamToggleObject then
-            -- Програмно змінюємо стан перемикача в UI
-            freeCamToggleObject:UpdateToggle(nil, not freecamEnabled)
-        end
-    end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Keyboard then
+		local name = input.KeyCode.Name
+		if moveKeys[name] ~= nil then moveKeys[name] = false end
+	end
+end)
 
-    -- Обробник для заморозки персонажа при респавні, якщо камера активна
-    Player.CharacterAdded:Connect(function(char)
-        if freecamEnabled then
-            task.wait(0.1)
-            freezeCharacter(char, true)
-        end
-    end)
-end
+-- Перезапуск FreeCam після респавну
+player.CharacterAdded:Connect(function(char)
+	if freecamEnabled then
+		char:WaitForChild("HumanoidRootPart",2)
+		freezeCharacter(char,true)
+	end
+end)
 
--- Ця функція викликається при закритті GUI для очищення
-function FreeCamModule:Shutdown()
-    disableFreeCam()
-end
-
-return FreeCamModule
+-- Повертаємо функції для виклику з меню
+return {
+	Enable = enableFreeCam,
+	Disable = disableFreeCam,
+	SetSpeed = setSpeed,
+	GetState = function() return freecamEnabled end
+}
