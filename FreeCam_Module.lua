@@ -46,24 +46,32 @@ local function enableInternal()
     pitch, yaw = math.deg(rx), math.deg(ry)
     camera.CameraType = Enum.CameraType.Scriptable
 
-    renderConn = RunService.RenderStepped:Connect(function(dt)
-        local dx, dy = UserInputService:GetMouseDelta().X, UserInputService:GetMouseDelta().Y
-        yaw = yaw - dx * FreeCam._sensitivity
-        pitch = math.clamp(pitch - dy * FreeCam._sensitivity, -89, 89)
-        local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
-        local fwd, right = rot.LookVector, rot.RightVector
-        local movement = Vector3.zero
-        if moveKeys.W then movement += fwd end
-        if moveKeys.S then movement -= fwd end
-        if moveKeys.A then movement -= right end
-        if moveKeys.D then movement += right end
-        if moveKeys.Space then movement += Vector3.yAxis end
-        if moveKeys.LeftControl then movement -= Vector3.yAxis end
-        local speed = FreeCam._baseSpeed
-        if moveKeys.LeftShift then speed *= FreeCam._sprintMultiplier end
-        if movement.Magnitude > 0 then camPos += movement.Unit * speed * dt end
-        camera.CFrame = CFrame.new(camPos) * rot
-    end)
+renderConn = RunService.RenderStepped:Connect(function(dt)
+    local dx, dy = UserInputService:GetMouseDelta().X, UserInputService:GetMouseDelta().Y
+    yaw = yaw - dx * FreeCam._sensitivity
+    pitch = math.clamp(pitch - dy * FreeCam._sensitivity, -89, 89)
+    local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
+    local fwd, right = rot.LookVector, rot.RightVector
+
+    local movement = Vector3.zero
+    if moveKeys.W then movement += fwd end
+    if moveKeys.S then movement -= fwd end
+    if moveKeys.A then movement -= right end
+    if moveKeys.D then movement += right end
+    if moveKeys.Space then movement += Vector3.yAxis end
+    if moveKeys.LeftControl then movement -= Vector3.yAxis end
+
+    -- Оновлена швидкість
+    local speed = FreeCam._baseSpeed
+    if moveKeys.LeftShift then speed *= FreeCam._sprintMultiplier end
+
+    if movement.Magnitude > 0 then
+        camPos += movement.Unit * speed * dt
+    end
+
+    camera.CFrame = CFrame.new(camPos) * rot
+end)
+
 
     charAddedConn = player.CharacterAdded:Connect(function(char)
         if FreeCam._enabled then
