@@ -1,61 +1,177 @@
 -- FreeCam_Module.lua
--- Сучасна версія FreeCam з власним GUI
-
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 local FreeCam = {}
-FreeCam.Enabled = false
-FreeCam.Speed = 32
+FreeCam._enabled = false
+FreeCam._baseSpeed = 32
+FreeCam._minSpeed, FreeCam._maxSpeed = 5, 250
+FreeCam._sensitivity = 0.18
+FreeCam._sprintMultiplier = 3
 
-function FreeCam:Toggle()
-    self.Enabled = not self.Enabled
-    if self.Enabled then
-        self:Enable()
-    else
-        self:Disable()
+-- internal state
+local pitch, yaw = 0, 0
+local camPos = nil
+local renderConn = nil
+local moveKeys = {W=false,A=false,S=false,D=false,Space=false,LeftControl=false,LeftShift=false}
+local hotkey = Enum.KeyCode.F
+local inputBeganConn, inputEndedConn, charAddedConn = nil, nil, nil
+
+-- freeze helper
+local function freezeCharacter(char, freeze)
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.Anchored = freeze end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = freeze and 0 or 16
+        hum.JumpPower = freeze and 0 or 50
     end
 end
 
-function FreeCam:Enable()
+-- enable/disable internal
+local function enableInternal()
+    if FreeCam._enabled then return end
+    FreeCam._enabled = true
+
     local char = player.Character or player.CharacterAdded:Wait()
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.WalkSpeed = 0
-        hum.JumpPower = 0
-    end
+    freezeCharacter(char, true)
+
+    UserInputService.MouseIconEnabled = false
+    UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+
+    camPos = camera.CFrame.Position
+    local rx, ry, rz = camera.CFrame:ToEulerAnglesYXZ()
+    pitch, yaw = math.deg(rx), math.deg(ry)
     camera.CameraType = Enum.CameraType.Scriptable
-    self.CamPos = camera.CFrame.Position
+
+    renderConn = RunService.RenderStepped:Connect(function(dt)
+        local dx, dy = UserInputService:GetMouseDelta().X, UserInputService:GetMouseDelta().Y
+        yaw = yaw - dx * FreeCam._sensitivity
+        pitch = math.clamp(pitch - dy * FreeCam._sensitivity, -89, 89)
+        local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
+        local fwd, right = rot.LookVector, rot.RightVector
+        local movement = Vector3.zero
+        if moveKeys.W then movement += fwd end
+        if moveKeys.S then movement -= fwd end
+        if moveKeys.A then movement -= right end
+        if moveKeys.D then movement += right end
+        if moveKeys.Space then movement += Vector3.yAxis end
+        if moveKeys.LeftControl then movement -= Vector3.yAxis end
+        local speed = FreeCam._baseSpeed
+        if moveKeys.LeftShift then speed *= FreeCam._sprintMultiplier end
+        if movement.Magnitude > 0 then camPos += movement.Unit * speed * dt end
+        camera.CFrame = CFrame.new(camPos) * rot
+    end)
+
+    -- character respawn handling
+    charAddedConn = player.CharacterAdded:Connect(function(char)
+        if FreeCam._enabled then
+            char:WaitForChild("HumanoidRootPart", 2)
+            freezeCharacter(char, true)
+        end
+    end)
 end
 
-function FreeCam:Disable()
+local function disableInternal()
+    if not FreeCam._enabled then return end
+    FreeCam._enabled = false
+
+    if renderConn then renderConn:Disconnect() renderConn = nil end
+    if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
+
+    UserInputService.MouseIconEnabled = true
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
     local char = player.Character or player.CharacterAdded:Wait()
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.WalkSpeed = 16
-        hum.JumpPower = 50
-    end
+    freezeCharacter(char, false)
     camera.CameraType = Enum.CameraType.Custom
-    camera.CameraSubject = char:FindFirstChildOfClass("Humanoid")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then camera.CameraSubject = hum end
 end
 
+-- Public API
+function FreeCam:Enable() enableInternal() end
+function FreeCam:Disable() disableInternal() end
+function FreeCam:Toggle()
+    if self._enabled then self:Disable() else self:Enable() end
+end
+function FreeCam:SetSpeed(v)
+    self._baseSpeed = math.clamp(tonumber(v) or self._baseSpeed, self._minSpeed, self._maxSpeed)
+end
+function FreeCam:GetState() return self._enabled end
+
+-- Input handling should be registered once when module inited
+local function registerInputHandling()
+    if inputBeganConn or inputEndedConn then return end
+
+    inputBeganConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed or UserInputService:GetFocusedTextBox() then return end
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local name = input.KeyCode.Name
+            if moveKeys[name] ~= nil then moveKeys[name] = true end
+            if input.KeyCode == hotkey then
+                FreeCam:Toggle()
+            end
+        end
+    end)
+
+    inputEndedConn = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local name = input.KeyCode.Name
+            if moveKeys[name] ~= nil then moveKeys[name] = false end
+        end
+    end)
+end
+
+local function unregisterInputHandling()
+    if inputBeganConn then inputBeganConn:Disconnect() inputBeganConn = nil end
+    if inputEndedConn then inputEndedConn:Disconnect() inputEndedConn = nil end
+    if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
+end
+
+-- Init(section) — додає елементи у UI секцію (Toggle + Slider)
 function FreeCam:Init(section)
-    section:NewToggle("FreeCam", "Enable FreeCam", function(val)
-        self:Toggle()
+    -- Ставимо значення за замовчуванням
+    FreeCam._baseSpeed = 32
+
+    -- Реєструємо глобальні клавіші
+    registerInputHandling()
+
+    -- Додаємо Toggle
+    pcall(function()
+        if section and section.NewToggle then
+            section:NewToggle("FreeCam", "Enable/Disable FreeCam (or press F)", function(val)
+                if val then
+                    FreeCam:Enable()
+                else
+                    FreeCam:Disable()
+                end
+            end, FreeCam._enabled)
+        else
+            -- якщо секція не має API, створимо просту кнопку в Library (любий fallback)
+            -- (немає гарантії, залежить від UI бібліотеки)
+        end
     end)
-    section:NewSlider("Speed", "FreeCam speed", 5, 250, function(val)
-        self.Speed = val
+
+    -- Додаємо Slider
+    pcall(function()
+        if section and section.NewSlider then
+            section:NewSlider("Speed", "FreeCam speed", FreeCam._minSpeed, FreeCam._maxSpeed, FreeCam._baseSpeed, function(val)
+                FreeCam:SetSpeed(val)
+            end)
+        end
     end)
 end
 
+-- Shutdown: очищаємо все
 function FreeCam:Shutdown()
-    if self.Enabled then
-        self:Disable()
-    end
+    disableInternal()
+    unregisterInputHandling()
 end
 
 return FreeCam
