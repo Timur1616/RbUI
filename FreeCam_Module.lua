@@ -13,15 +13,13 @@ FreeCam._minSpeed, FreeCam._maxSpeed = 5, 250
 FreeCam._sensitivity = 0.18
 FreeCam._sprintMultiplier = 3
 
--- internal state
 local pitch, yaw = 0, 0
 local camPos = nil
 local renderConn = nil
 local moveKeys = {W=false,A=false,S=false,D=false,Space=false,LeftControl=false,LeftShift=false}
-local hotkey = Enum.KeyCode.F
+
 local inputBeganConn, inputEndedConn, charAddedConn = nil, nil, nil
 
--- freeze helper
 local function freezeCharacter(char, freeze)
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -33,7 +31,6 @@ local function freezeCharacter(char, freeze)
     end
 end
 
--- enable/disable internal
 local function enableInternal()
     if FreeCam._enabled then return end
     FreeCam._enabled = true
@@ -68,7 +65,6 @@ local function enableInternal()
         camera.CFrame = CFrame.new(camPos) * rot
     end)
 
-    -- character respawn handling
     charAddedConn = player.CharacterAdded:Connect(function(char)
         if FreeCam._enabled then
             char:WaitForChild("HumanoidRootPart", 2)
@@ -105,7 +101,7 @@ function FreeCam:SetSpeed(v)
 end
 function FreeCam:GetState() return self._enabled end
 
--- Input handling should be registered once when module inited
+-- Input handling для переміщення без toggle через F
 local function registerInputHandling()
     if inputBeganConn or inputEndedConn then return end
 
@@ -114,9 +110,6 @@ local function registerInputHandling()
         if input.UserInputType == Enum.UserInputType.Keyboard then
             local name = input.KeyCode.Name
             if moveKeys[name] ~= nil then moveKeys[name] = true end
-            if input.KeyCode == hotkey then
-                FreeCam:Toggle()
-            end
         end
     end)
 
@@ -134,31 +127,24 @@ local function unregisterInputHandling()
     if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
 end
 
--- Init(section) — додає елементи у UI секцію (Toggle + Slider)
 function FreeCam:Init(section)
-    -- Ставимо значення за замовчуванням
     FreeCam._baseSpeed = 32
-
-    -- Реєструємо глобальні клавіші
     registerInputHandling()
 
-    -- Додаємо Toggle
+    -- Toggle в UI
     pcall(function()
         if section and section.NewToggle then
-            section:NewToggle("FreeCam", "Enable/Disable FreeCam (or press F)", function(val)
+            section:NewToggle("FreeCam", "Enable/Disable FreeCam", function(val)
                 if val then
                     FreeCam:Enable()
                 else
                     FreeCam:Disable()
                 end
             end, FreeCam._enabled)
-        else
-            -- якщо секція не має API, створимо просту кнопку в Library (любий fallback)
-            -- (немає гарантії, залежить від UI бібліотеки)
         end
     end)
 
-    -- Додаємо Slider
+    -- Slider для швидкості
     pcall(function()
         if section and section.NewSlider then
             section:NewSlider("Speed", "FreeCam speed", FreeCam._minSpeed, FreeCam._maxSpeed, FreeCam._baseSpeed, function(val)
@@ -168,7 +154,6 @@ function FreeCam:Init(section)
     end)
 end
 
--- Shutdown: очищаємо все
 function FreeCam:Shutdown()
     disableInternal()
     unregisterInputHandling()
