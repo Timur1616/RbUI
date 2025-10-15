@@ -46,32 +46,30 @@ local function enableInternal()
     pitch, yaw = math.deg(rx), math.deg(ry)
     camera.CameraType = Enum.CameraType.Scriptable
 
-renderConn = RunService.RenderStepped:Connect(function(dt)
-    local dx, dy = UserInputService:GetMouseDelta().X, UserInputService:GetMouseDelta().Y
-    yaw = yaw - dx * FreeCam._sensitivity
-    pitch = math.clamp(pitch - dy * FreeCam._sensitivity, -89, 89)
-    local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
-    local fwd, right = rot.LookVector, rot.RightVector
+    renderConn = RunService.RenderStepped:Connect(function(dt)
+        local dx, dy = UserInputService:GetMouseDelta().X, UserInputService:GetMouseDelta().Y
+        yaw = yaw - dx * FreeCam._sensitivity
+        pitch = math.clamp(pitch - dy * FreeCam._sensitivity, -89, 89)
+        local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
+        local fwd, right = rot.LookVector, rot.RightVector
 
-    local movement = Vector3.zero
-    if moveKeys.W then movement += fwd end
-    if moveKeys.S then movement -= fwd end
-    if moveKeys.A then movement -= right end
-    if moveKeys.D then movement += right end
-    if moveKeys.Space then movement += Vector3.yAxis end
-    if moveKeys.LeftControl then movement -= Vector3.yAxis end
+        local movement = Vector3.zero
+        if moveKeys.W then movement += fwd end
+        if moveKeys.S then movement -= fwd end
+        if moveKeys.A then movement -= right end
+        if moveKeys.D then movement += right end
+        if moveKeys.Space then movement += Vector3.yAxis end
+        if moveKeys.LeftControl then movement -= Vector3.yAxis end
 
-    -- Оновлена швидкість
-    local speed = FreeCam._baseSpeed
-    if moveKeys.LeftShift then speed *= FreeCam._sprintMultiplier end
+        local speed = FreeCam._baseSpeed
+        if moveKeys.LeftShift then speed *= FreeCam._sprintMultiplier end
 
-    if movement.Magnitude > 0 then
-        camPos += movement.Unit * speed * dt
-    end
+        if movement.Magnitude > 0 then
+            camPos += movement.Unit * speed * dt
+        end
 
-    camera.CFrame = CFrame.new(camPos) * rot
-end)
-
+        camera.CFrame = CFrame.new(camPos) * rot
+    end)
 
     charAddedConn = player.CharacterAdded:Connect(function(char)
         if FreeCam._enabled then
@@ -109,7 +107,7 @@ function FreeCam:SetSpeed(v)
 end
 function FreeCam:GetState() return self._enabled end
 
--- Input handling для переміщення без toggle через F
+-- Input handling
 local function registerInputHandling()
     if inputBeganConn or inputEndedConn then return end
 
@@ -139,7 +137,7 @@ function FreeCam:Init(section)
     FreeCam._baseSpeed = 32
     registerInputHandling()
 
-    -- Toggle в UI
+    -- Toggle у UI
     pcall(function()
         if section and section.NewToggle then
             section:NewToggle("FreeCam", "Enable/Disable FreeCam", function(val)
@@ -152,7 +150,7 @@ function FreeCam:Init(section)
         end
     end)
 
-    -- Slider для швидкості
+    -- Slider швидкості
     pcall(function()
         if section and section.NewSlider then
             section:NewSlider("Speed", "FreeCam speed", FreeCam._minSpeed, FreeCam._maxSpeed, FreeCam._baseSpeed, function(val)
