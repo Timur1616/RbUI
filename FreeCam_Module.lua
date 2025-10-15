@@ -1,149 +1,18 @@
 --[[
     ================================================
-    Universal Free Cam (Виправлена версія 2.0)
+    Модуль логіки для Universal Free Cam
+    (Без власного GUI, для інтеграції з RbUI)
     ================================================
 ]]
+local FreeCamModule = {}
 
-local Players = game:GetService("Players")
+-- Сервіси та змінні
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
+local Player = game:GetService("Players").LocalPlayer
 
-local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-
--- Налаштування GUI (без змін)
-local DISPLAY_ORDER = 10000
-local CONTAINER_W, CONTAINER_H = 200, 136
-local BTN_W, BTN_H = 88, 26
-local BTN_COLOR = Color3.fromRGB(28, 28, 28)
-local BTN_HOVER = Color3.fromRGB(82, 44, 154)
-local TEXT_COLOR = Color3.fromRGB(210, 190, 255)
-local LABEL_COLOR = Color3.fromRGB(180, 120, 255)
-local BORDER_COL = Color3.fromRGB(120, 0, 180)
-local baseColors = {
-	Color3.fromRGB(100,0,130),
-	Color3.fromRGB(120,0,160),
-	Color3.fromRGB(150,0,200),
-	Color3.fromRGB(120,0,160),
-}
-
--- Створення GUI (без змін)
-local gui = Instance.new("ScreenGui")
-gui.Name = "UniversalFreeCam"
-gui.IgnoreGuiInset = true
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-gui.DisplayOrder = DISPLAY_ORDER
-pcall(function() gui.Parent = CoreGui end)
-if not gui.Parent then gui.Parent = player:WaitForChild("PlayerGui") end
-
-local container = Instance.new("Frame")
-container.Size = UDim2.fromOffset(CONTAINER_W, CONTAINER_H)
-container.Position = UDim2.new(0, 18, 0, 18)
-container.BackgroundColor3 = Color3.fromRGB(18,18,18)
-container.BorderSizePixel = 2
-container.BorderColor3 = BORDER_COL
-container.Parent = gui
-Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-
-local grad = Instance.new("UIGradient")
-grad.Rotation = 0
-grad.Parent = container
-local animT = 0
-RunService.RenderStepped:Connect(function(dt)
-	animT = animT + dt
-	local idx = math.floor(animT * 1.6) % #baseColors + 1
-	local nextIdx = idx % #baseColors + 1
-	local alpha = (animT * 1.6) % 1
-	local c1 = baseColors[idx]:Lerp(baseColors[nextIdx], alpha)
-	local c2 = baseColors[nextIdx]:Lerp(baseColors[idx], alpha)
-	grad.Color = ColorSequence.new{ ColorSequenceKeypoint.new(0, c1), ColorSequenceKeypoint.new(1, c2) }
-end)
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -18, 0, 22)
-title.Position = UDim2.fromOffset(9, 8)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 14
-title.TextColor3 = LABEL_COLOR
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Text = "Universal Free Cam"
-title.Parent = container
-
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.fromOffset(BTN_W, BTN_H)
-toggleBtn.Position = UDim2.fromOffset(9, 36)
-toggleBtn.BackgroundColor3 = BTN_COLOR
-toggleBtn.Font = Enum.Font.GothamSemibold
-toggleBtn.TextSize = 12
-toggleBtn.TextColor3 = TEXT_COLOR
-toggleBtn.Text = "OFF"
-toggleBtn.AutoButtonColor = false
-toggleBtn.Parent = container
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 4)
-
-local bindBtn = Instance.new("TextButton")
-bindBtn.Size = UDim2.fromOffset(BTN_W, BTN_H)
-bindBtn.Position = UDim2.fromOffset(9 + BTN_W + 8, 36)
-bindBtn.BackgroundColor3 = BTN_COLOR
-bindBtn.Font = Enum.Font.GothamSemibold
-bindBtn.TextSize = 12
-bindBtn.TextColor3 = TEXT_COLOR
-bindBtn.Text = "Key: F"
-bindBtn.AutoButtonColor = false
-bindBtn.Parent = container
-Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
-
-local sliderLabel = Instance.new("TextLabel")
-sliderLabel.Size = UDim2.fromOffset(60, 18)
-sliderLabel.Position = UDim2.fromOffset(9, 72)
-sliderLabel.BackgroundTransparency = 1
-sliderLabel.Font = Enum.Font.Gotham
-sliderLabel.TextSize = 12
-sliderLabel.TextColor3 = LABEL_COLOR
-sliderLabel.Text = "Speed"
-sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-sliderLabel.Parent = container
-
-local valueLabel = Instance.new("TextLabel")
-valueLabel.Size = UDim2.fromOffset(60, 18)
-valueLabel.Position = UDim2.fromOffset(CONTAINER_W - 9 - 60, 72)
-valueLabel.BackgroundTransparency = 1
-valueLabel.Font = Enum.Font.Gotham
-valueLabel.TextSize = 12
-valueLabel.TextColor3 = LABEL_COLOR
-valueLabel.Text = ""
-valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-valueLabel.Parent = container
-
-local SLIDER_MARGIN = 9
-local sliderBar = Instance.new("Frame")
-sliderBar.Size = UDim2.fromOffset(CONTAINER_W - SLIDER_MARGIN*2, 6)
-sliderBar.Position = UDim2.fromOffset(SLIDER_MARGIN, 98)
-sliderBar.BackgroundColor3 = Color3.fromRGB(36,36,36)
-sliderBar.BorderSizePixel = 0
-sliderBar.Parent = container
-Instance.new("UICorner", sliderBar).CornerRadius = UDim.new(0, 3)
-
-local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new(0, 0, 1, 0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(140,72,200)
-sliderFill.BorderSizePixel = 0
-sliderFill.Parent = sliderBar
-Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(0, 3)
-
-local knobSize = 12
-local sliderKnob = Instance.new("Frame")
-sliderKnob.Size = UDim2.fromOffset(knobSize, knobSize)
-sliderKnob.Position = UDim2.fromOffset(-knobSize/2, -3)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(200,150,255)
-sliderKnob.BorderSizePixel = 0
-sliderKnob.Parent = sliderBar
-Instance.new("UICorner", sliderKnob).CornerRadius = UDim.new(0, 6)
-
--- ЗМІННІ FREE CAM
+-- Локальні змінні стану
 local freecamEnabled = false
 local baseSpeed = 32
 local minSpeed, maxSpeed = 5, 250
@@ -151,17 +20,9 @@ local sensitivity = 0.18
 local sprintMultiplier = 3
 local pitch, yaw = 0, 0
 local camPos = nil
-local hotkey = Enum.KeyCode.F
-local waitingForBind = false
+local freeCamToggleObject = nil -- Для зв'язку з UI
 
--- Функції-хелпери
-local hoverTweenInfo = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local function AddHover(button, hoverColor)
-	button.MouseEnter:Connect(function() TweenService:Create(button, hoverTweenInfo, {BackgroundColor3 = hoverColor}):Play() end)
-	button.MouseLeave:Connect(function() TweenService:Create(button, hoverTweenInfo, {BackgroundColor3 = BTN_COLOR}):Play() end)
-end
-AddHover(toggleBtn, BTN_HOVER); AddHover(bindBtn, Color3.fromRGB(100,50,180)); AddHover(sliderKnob, Color3.fromRGB(255,200,255))
-
+-- "Заморожує" або "розморожує" персонажа
 local function freezeCharacter(char, freeze)
 	if not char then return end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -173,19 +34,15 @@ local function freezeCharacter(char, freeze)
 	end
 end
 
--- ==========================================================
--- ОСНОВНА ЛОГІКА FREE CAM (ВИПРАВЛЕНО)
--- ==========================================================
-
--- Ця функція буде оновлювати камеру кожен кадр
+-- Функція, що оновлює позицію камери кожен кадр
 local function updateCamera(dt)
-	-- Обертання камери
+	-- Обертання камери за рухом миші
 	local mouseDelta = UserInputService:GetMouseDelta()
 	yaw = yaw - mouseDelta.X * sensitivity
 	pitch = math.clamp(pitch - mouseDelta.Y * sensitivity, -89, 89)
 	local rot = CFrame.fromEulerAnglesYXZ(math.rad(pitch), math.rad(yaw), 0)
 	
-	-- Рух камери
+	-- Рух камери за натисканням клавіш
 	local fwd, right = rot.LookVector, rot.RightVector
 	local movement = Vector3.zero
 	if UserInputService:IsKeyDown(Enum.KeyCode.W) then movement += fwd end
@@ -202,39 +59,40 @@ local function updateCamera(dt)
 		camPos += movement.Unit * speed * dt
 	end
 	
+	-- Застосування нової позиції до камери
 	camera.CFrame = CFrame.new(camPos) * rot
 end
 
+-- Вмикає режим вільної камери
 local function enableFreeCam()
 	if freecamEnabled then return end
 	freecamEnabled = true
-	toggleBtn.Text = "ON"; toggleBtn.BackgroundColor3 = Color3.fromRGB(60,120,60)
 	
-	local char = player.Character
+	local char = Player.Character
 	freezeCharacter(char, true)
 	
 	UserInputService.MouseIconEnabled = false
 	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 	camPos = camera.CFrame.Position
-	local ry, rx = camera.CFrame:ToEulerAnglesYXZ() -- Правильний порядок
+	local ry, rx = camera.CFrame:ToEulerAnglesYXZ()
 	pitch, yaw = math.deg(rx), math.deg(ry)
 	camera.CameraType = Enum.CameraType.Scriptable
 	
-	-- **КЛЮЧОВЕ ВИПРАВЛЕННЯ:** Прив'язуємо оновлення до RenderStepped з високим пріоритетом
+	-- Прив'язуємо оновлення до RenderStepped з високим пріоритетом
 	RunService:BindToRenderStep("FreeCamUpdate", Enum.RenderPriority.Camera.Value + 1, updateCamera)
 end
 
+-- Вимикає режим вільної камери
 local function disableFreeCam()
 	if not freecamEnabled then return end
 	freecamEnabled = false
-	toggleBtn.Text = "OFF"; toggleBtn.BackgroundColor3 = BTN_COLOR
 	
 	-- Відв'язуємо функцію оновлення
 	RunService:UnbindFromRenderStep("FreeCamUpdate")
 	
 	UserInputService.MouseIconEnabled = true
 	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-	local char = player.Character
+	local char = Player.Character
 	freezeCharacter(char, false)
 	
 	camera.CameraType = Enum.CameraType.Custom
@@ -243,47 +101,35 @@ local function disableFreeCam()
 	end
 end
 
--- Логіка слайдера (без змін)
-local function setSpeedFromPercent(p)
-	p = math.clamp(p or 0,0,1)
-	baseSpeed = math.floor(minSpeed+(maxSpeed-minSpeed)*p+0.5)
-	valueLabel.Text = tostring(baseSpeed)
-	sliderFill.Size = UDim2.new(p,0,1,0)
-	sliderKnob.Position = UDim2.new(p,-knobSize/2,0,-3)
+-- Ця функція викликається головним скриптом для створення елементів керування
+function FreeCamModule:Init(freeCamSection)
+    freeCamToggleObject = freeCamSection:NewToggle("Enable Free Cam", "Activates free camera mode", function(toggled)
+        if toggled then enableFreeCam() else disableFreeCam() end
+    end)
+    
+    freeCamSection:NewSlider("Speed", "Adjusts camera movement speed", maxSpeed, minSpeed, function(value)
+        baseSpeed = math.floor(value)
+    end):UpdateSlider(baseSpeed)
+    
+    freeCamSection:NewKeybind("Toggle Hotkey", "Set a key to toggle free cam", Enum.KeyCode.F, function()
+        if freeCamToggleObject then
+            -- Програмно змінюємо стан перемикача в UI
+            freeCamToggleObject:UpdateToggle(nil, not freecamEnabled)
+        end
+    end)
+
+    -- Обробник для заморозки персонажа при респавні, якщо камера активна
+    Player.CharacterAdded:Connect(function(char)
+        if freecamEnabled then
+            task.wait(0.1)
+            freezeCharacter(char, true)
+        end
+    end)
 end
-setSpeedFromPercent((baseSpeed-minSpeed)/(maxSpeed-minSpeed))
 
-local draggingSlider=false
-local function updateSliderFromX(x)
-	local barX, barW = sliderBar.AbsolutePosition.X, sliderBar.AbsoluteSize.X
-	if barW <= 0 then return end
-	setSpeedFromPercent((x-barX)/barW)
+-- Ця функція викликається при закритті GUI для очищення
+function FreeCamModule:Shutdown()
+    disableFreeCam()
 end
 
-sliderBar.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 then draggingSlider=true; updateSliderFromX(input.Position.X) end end)
-sliderBar.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 then draggingSlider=false end end)
-UserInputService.InputChanged:Connect(function(input) if draggingSlider and input.UserInputType==Enum.UserInputType.MouseMovement then updateSliderFromX(input.Position.X) end end)
-
--- Обробники кнопок та хоткеїв (без змін)
-UserInputService.InputBegan:Connect(function(input, gp)
-	if waitingForBind and input.UserInputType==Enum.UserInputType.Keyboard then
-		hotkey=input.KeyCode; bindBtn.Text="Key: "..hotkey.Name; waitingForBind=false; return
-	end
-	if gp or UserInputService:GetFocusedTextBox() then return end
-	
-	if input.KeyCode==hotkey then
-		if freecamEnabled then disableFreeCam() else enableFreeCam() end
-	elseif input.KeyCode==Enum.KeyCode.RightShift then
-		container.Visible = not container.Visible
-	end
-end)
-
-bindBtn.MouseButton1Click:Connect(function() if not waitingForBind then waitingForBind=true; bindBtn.Text="Press any key..." end end)
-toggleBtn.MouseButton1Click:Connect(function() if freecamEnabled then disableFreeCam() else enableFreeCam() end end)
-
--- Перетягування вікна (без змін)
-local dragging=false; local dragInput, mousePos, framePos
-title.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; mousePos=input.Position; framePos=container.Position; input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false end end) end end)
-UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then local delta=input.Position-mousePos; container.Position=UDim2.new(framePos.X.Scale,framePos.X.Offset+delta.X,framePos.Y.Scale,framePos.Y.Offset+delta.Y) end end)
-
-player.CharacterAdded:Connect(function(char) if freecamEnabled then task.wait(0.1); freezeCharacter(char,true) end end)
+return FreeCamModule
