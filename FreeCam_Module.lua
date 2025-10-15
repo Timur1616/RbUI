@@ -1,7 +1,7 @@
 --[[
     ================================================
     Модуль логіки для Universal Free Cam
-    (Без власного GUI, для інтеграції з RbUI)
+    (Виправлена версія 2.1 - Надійна обробка вводу)
     ================================================
 ]]
 local FreeCamModule = {}
@@ -79,7 +79,7 @@ local function enableFreeCam()
 	camera.CameraType = Enum.CameraType.Scriptable
 	
 	-- Прив'язуємо оновлення до RenderStepped з високим пріоритетом
-	RunService:BindToRenderStep("FreeCamUpdate", Enum.RenderPriority.Camera.Value + 1, updateCamera)
+	RunService:BindToRenderStep("FreeCamUpdate", Enum.RenderPriority.Camera.Value + 10, updateCamera)
 end
 
 -- Вимикає режим вільної камери
