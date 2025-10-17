@@ -10,14 +10,18 @@ local bodyVelocity = nil
 local floatConnection = nil
 
 local function updateFloat()
-    if floatEnabled and Player.Character and Player.Character.PrimaryPart then
-        if not bodyVelocity or bodyVelocity.Parent ~= Player.Character.PrimaryPart then
+    local char = Player.Character
+    if floatEnabled and char and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+        if not bodyVelocity or bodyVelocity.Parent ~= hrp then
             bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.MaxForce = Vector3.new(0, workspace.Gravity * Player.Character.PrimaryPart:GetMass(), 0)
-            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-            bodyVelocity.Parent = Player.Character.PrimaryPart
+            -- ✅ ВИПРАВЛЕНО: Використовуємо нескінченну силу, щоб гарантовано зупинити рух
+            bodyVelocity.MaxForce = Vector3.new(0, math.huge, 0)
+            bodyVelocity.Parent = hrp
         end
-    elseif not floatEnabled and bodyVelocity then
+        -- ✅ ВИПРАВЛЕНО: Постійно встановлюємо вертикальну швидкість на 0
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    elseif (not floatEnabled or not char) and bodyVelocity then
         bodyVelocity:Destroy()
         bodyVelocity = nil
     end
@@ -37,14 +41,13 @@ function MiscModule:Init(section)
 		platform.Color = Color3.fromRGB(29, 29, 32)
 		platform.Material = Enum.Material.SmoothPlastic
 		platform.Parent = workspace
-		game:GetService("Debris"):AddItem(platform, 15) -- Платформа зникне через 15 секунд
+		game:GetService("Debris"):AddItem(platform, 15)
 	end)
 
 	-- Float
 	section:NewToggle("Float", "Makes you float in the air", function(enabled)
 		floatEnabled = enabled
         if enabled and not floatConnection then
-            updateFloat()
             floatConnection = RunService.Heartbeat:Connect(updateFloat)
         elseif not enabled and floatConnection then
             floatConnection:Disconnect()
@@ -56,7 +59,9 @@ function MiscModule:Init(section)
 	-- Fake Chat
 	section:NewTextBox("Fake Chat", "Send a message as if you typed it", function(text)
 		if text ~= "" then
-            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(text, "All")
+            pcall(function()
+                game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(text, "All")
+            end)
 		end
 	end)
 end
