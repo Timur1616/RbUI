@@ -1,4 +1,4 @@
--- FreeCam_Module.lua
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -65,7 +65,7 @@ renderConn = RunService.RenderStepped:Connect(function(dt)
     if moveKeys.LeftShift then speed *= FreeCam._sprintMultiplier end
 
     if movement.Magnitude > 0 then
-        movement = movement.Unit * speed * dt -- нормалізуємо
+        movement = movement.Unit * speed * dt 
         camPos += movement
     end
 
@@ -97,7 +97,7 @@ local function disableInternal()
     if hum then camera.CameraSubject = hum end
 end
 
--- Public API
+
 function FreeCam:Enable() enableInternal() end
 function FreeCam:Disable() disableInternal() end
 function FreeCam:Toggle()
@@ -108,7 +108,7 @@ function FreeCam:SetSpeed(v)
 end
 function FreeCam:GetState() return self._enabled end
 
--- Input handling
+
 local function registerInputHandling()
     if inputBeganConn or inputEndedConn then return end
 
@@ -138,7 +138,6 @@ function FreeCam:Init(section)
     FreeCam._baseSpeed = 32
     registerInputHandling()
 
-    -- Toggle у UI
     pcall(function()
         if section and section.NewToggle then
             section:NewToggle("FreeCam", "Enable/Disable FreeCam", function(val)
@@ -151,7 +150,6 @@ function FreeCam:Init(section)
         end
     end)
 
-    -- Slider швидкості
 
 end
 
