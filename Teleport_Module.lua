@@ -1,16 +1,9 @@
---[[
-    ================================================
-    Повний модуль телепортації (Об'єднана версія)
-    ================================================
-]]
+
 local TeleportModule = {}
 
--- Сервіси Roblox
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-
--- Локальні змінні
 local player = Players.LocalPlayer
 local showCoords = false
 local coordsLabel = nil
@@ -19,8 +12,6 @@ local targetPlayerName = nil
 local dropdown = nil
 local clickTeleportEnabled = false
 local clickTpConnection = nil
-
--- Функція для безпечного отримання HumanoidRootPart
 local function getHumanoidRootPart(p)
     local character = p and p.Character
     if character then
@@ -29,7 +20,7 @@ local function getHumanoidRootPart(p)
     return nil
 end
 
--- Функція для отримання списку імен гравців
+
 local function getPlayerNames()
     local names = {}
     for _, p in ipairs(Players:GetPlayers()) do
@@ -40,7 +31,6 @@ local function getPlayerNames()
     return names
 end
 
--- Обробник кліку для телепортації
 local function onClickToTeleport(input, gameProcessed)
     if gameProcessed or not clickTeleportEnabled then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -52,11 +42,8 @@ local function onClickToTeleport(input, gameProcessed)
     end
 end
 
--- Основна функція ініціалізації модуля
 function TeleportModule:Init(section)
-    --[[
-        РОЗДІЛ 1: ТЕЛЕПОРТАЦІЯ ДО ГРАВЦЯ
-    ]]
+
     section:NewLabel("Teleport to Player:")
 
     dropdown = section:NewDropdown("Select Player", "Оберіть гравця для телепортації", getPlayerNames(), function(selectedPlayer)
@@ -80,9 +67,7 @@ function TeleportModule:Init(section)
         fastTeleportActive = state
     end)
 
-    --[[
-        РОЗДІЛ 2: СПЕЦІАЛЬНІ ТЕЛЕПОРТИ
-    ]]
+
     section:NewLabel("Special Teleports:")
 
     section:NewToggle("Click to Teleport", "Телепортує вас туди, куди ви клікнете", function(enabled)
@@ -96,7 +81,7 @@ function TeleportModule:Init(section)
 	end)
 
 	section:NewButton("Ultra Instinct", "Телепортуватися за спину найближчого гравця", function()
-		local closestPlayer, closestDistance = nil, 50 -- Збільшив радіус пошуку
+		local closestPlayer, closestDistance = nil, 50 
 		local localHRP = getHumanoidRootPart(player)
 		if not localHRP then return end
 		
@@ -115,21 +100,18 @@ function TeleportModule:Init(section)
 		
 		if closestPlayer then
 			local targetHRP = getHumanoidRootPart(closestPlayer)
-			local behindPosition = targetHRP.CFrame * CFrame.new(0, 0, 4) -- Телепорт за спину
+			local behindPosition = targetHRP.CFrame * CFrame.new(0, 0, 4) 
 			localHRP.CFrame = CFrame.new(behindPosition.Position, targetHRP.Position)
 		end
 	end)
 
-    --[[
-        РОЗДІЛ 3: ТЕЛЕПОРТАЦІЯ ЗА КООРДИНАТАМИ
-    ]]
     section:NewLabel("Coords & Position:")
 
     section:NewTextBox("Teleport (X,Y,Z)", "Введіть координати, напр. 100, 50, -200", function(text)
         local hrp = getHumanoidRootPart(player)
         if not hrp then return end
         local coords = {}
-        for num in text:gmatch("[-?%d%.]+") do -- Дозволяє десяткові числа
+        for num in text:gmatch("[-?%d%.]+") do 
             table.insert(coords, tonumber(num))
         end
         if #coords == 3 then
@@ -156,9 +138,6 @@ function TeleportModule:Init(section)
 
     coordsLabel = section:NewLabel("Coordinates: (Off)")
 
-    --[[
-        ГЛОБАЛЬНІ ОБРОБНИКИ ДЛЯ МОДУЛЯ
-    ]]
     local function refreshPlayerList()
         if dropdown then dropdown:Refresh(getPlayerNames()) end
     end
