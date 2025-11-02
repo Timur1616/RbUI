@@ -1,12 +1,8 @@
 local FlyModule = {}
-
--- Сервіси та змінні, потрібні для цього модуля
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local Player = game:GetService("Players").LocalPlayer
-
--- Локальні змінні стану
 local fly_nowe = false
 local fly_speeds = 1
 local fly_tpwalking = false
@@ -84,7 +80,6 @@ local function ToggleFly(enabled)
     end
 end
 
--- Функція ініціалізації, яка створює елементи UI
 function FlyModule:Init(flySection)
     flySection:NewToggle("Enable Fly", "Activates flight mode", function(toggled) ToggleFly(toggled) end)
     flySection:NewSlider("Speed", "Adjusts the speed of flight", 50, 1, function(value)
@@ -93,7 +88,6 @@ function FlyModule:Init(flySection)
     end)
 end
 
--- Функція для очищення при виході
 function FlyModule:Shutdown()
     ResetCharacterState()
 end
