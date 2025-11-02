@@ -1,12 +1,8 @@
 local ESPModule = {}
-
--- Сервіси та змінні
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local Player = Players.LocalPlayer
-
--- Локальні змінні стану
 local esp_settings = {
     Enabled = true, ShowNames = true, ShowOutline = true,
     ShowFill = false, ShowLines = false, TeamColor = false, Font = 2
@@ -61,7 +57,6 @@ local function CreateESP(player)
     end)
 end
 
--- Функція ініціалізації, яка створює UI та підключає обробники
 function ESPModule:Init(espSection)
     espSection:NewToggle("Enable ESP", "Toggles all ESP features", function(toggled) esp_settings.Enabled = toggled; UpdateAllESP() end)
     espSection:NewToggle("Show Names", "Displays player names", function(toggled) esp_settings.ShowNames = toggled end)
@@ -69,8 +64,7 @@ function ESPModule:Init(espSection)
     espSection:NewToggle("Show Fill", "Shows a colored fill", function(toggled) esp_settings.ShowFill = toggled end)
     espSection:NewToggle("Show Lines", "Draws lines to players", function(toggled) esp_settings.ShowLines = toggled end)
     espSection:NewToggle("Use Team Colors", "Colors ESP based on teams", function(toggled) esp_settings.TeamColor = toggled end)
-    
-    -- Підключення обробників
+
     Players.PlayerAdded:Connect(function(player)
         player.CharacterAdded:Connect(function() CreateESP(player) end)
         if player.Character then CreateESP(player) end
@@ -81,7 +75,6 @@ function ESPModule:Init(espSection)
     end
 end
 
--- Функція для очищення
 function ESPModule:Shutdown()
     for player in pairs(ESPCache) do
         RemoveESP(player)
